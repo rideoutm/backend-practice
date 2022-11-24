@@ -3,6 +3,9 @@ const http = require("http");
 const url = require("url");
 const PORT = 5000;
 
+const slugify = require("slugify");
+const replaceTemplate = require("./modules/replaceTemplate");
+
 //   /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Blocking, synchronous
@@ -31,23 +34,57 @@ const PORT = 5000;
 /////////////////////////////////////////////////
 // SERVER
 
+const tempOverview = fs.readFileSync(
+  `${__dirname}/templates/template-overview.html`,
+  "utf-8"
+);
+const tempCard = fs.readFileSync(
+  `${__dirname}/templates/template-card.html`,
+  "utf-8"
+);
+const tempProduct = fs.readFileSync(
+  `${__dirname}/templates/template-product.html`,
+  "utf-8"
+);
 const data = fs.readFileSync(`${__dirname}/dev-data/data.json`, "utf-8");
 const dataObj = JSON.parse(data);
+const slugs = dataObj.map((el) => slugify(el.productName, { lower: true }));
+console.log(slugs);
 
 const server = http.createServer((req, res) => {
-  const pathName = req.url;
+  console.log(url.parse(req.url, true));
+  const { query, pathname } = url.parse(req.url, true);
 
-  if (pathName === "/" || pathName === "/overview") {
-    res.end("This is the OVERVIEW");
-  } else if (pathName === "/product") {
-    res.end("This is the PRODUCT");
-  } else if (pathName === "/api") {
+  // Overview
+  if (pathname === "/" || pathname === "/overview") {
+    res.writeHead(200, { "Content-Type": "text/html" });
+
+    const cardsHtml = dataObj
+      .map((el) => replaceTemplate(tempCard, el))
+      .join("");
+    const output = tempOverview.replace("{%PRODUCT_CARDS%}", cardsHtml);
+
+    res.end(output);
+  }
+
+  // Product
+  else if (pathname === "/product") {
+    const product = dataObj[query.id];
+    res.writeHead(200, { "Content-Type": "text/html" });
+    const output = replaceTemplate(tempProduct, product);
+    res.end(output);
+  }
+
+  // API
+  else if (pathname === "/api") {
     fs.readFile(`${__dirname}/dev-data/data.json`, "utf-8", (err, data) => {
-      const productData = JSON.parse(data);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(data);
     });
-  } else {
+  }
+
+  // Not found
+  else {
     res.writeHead(404, {
       "Content-Type": "text/html",
     });
